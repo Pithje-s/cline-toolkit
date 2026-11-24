@@ -19,5 +19,5 @@ description: Run the mandatory fix→verify→retry loop until all checks are gr
 Детали и команды по типам проектов — skill `repair-loop`.
 
 - Сначала прогони `manage_knowledge` (list sections), затем `knowledge_search`
-- Для диагностики — `sequential-thinking` при多 ошибках
+- Для диагностики — `sequential-thinking` при множестве ошибок
 - Каждая итерация = правка + повторный запуск, не отчёт
