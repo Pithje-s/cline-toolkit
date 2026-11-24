@@ -6,8 +6,11 @@
 
 ## [Unreleased]
 
+## [0.5.2] - 2026-11-24
+
 ### Изменено
 - `EVAL.md`: раздел «Ограничения» переформулирован в «Область применимости» — что покрыто, что нет и как расширяется; добавлена инструкция, как добавить новую задачу в харнесс.
+- README и CHANGELOG используют одну терминологию — «границы применимости»; описание метрики `unverifiedDone` стало нейтральным.
 
 ## [0.5.1] - 2026-11-24
 
@@ -85,7 +88,8 @@
 - `install.ps1` — установка в глобальные каталоги Cline с сохранением ключа Tavily.
 - `LICENSE` (MIT), `.gitignore`, `README.md`.
 
-[Unreleased]: https://github.com/Pithje-s/cline-toolkit/compare/v0.5.1...HEAD
+[Unreleased]: https://github.com/Pithje-s/cline-toolkit/compare/v0.5.2...HEAD
+[0.5.2]: https://github.com/Pithje-s/cline-toolkit/compare/v0.5.1...v0.5.2
 [0.5.1]: https://github.com/Pithje-s/cline-toolkit/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/Pithje-s/cline-toolkit/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/Pithje-s/cline-toolkit/compare/v0.3.0...v0.4.0

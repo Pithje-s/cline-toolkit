@@ -72,7 +72,7 @@ param(
     [switch]$DryRun
 )
 
-$toolkitVersion = '0.5.1'
+$toolkitVersion = '0.5.2'
 
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
