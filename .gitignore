@@ -11,3 +11,13 @@ mcp/*.local.json
 **/_listing.txt
 **/_build.log
 **/_build.ps1
+
+# Локальное состояние Cline (сессии, worktrees, логи) — не должно попадать в git
+.cline-state/
+.cline/
+.clinerules/hooks/
+**/worktrees.json
+**/events.jsonl
+**/*.messages.json
+**/*.compaction.json
+**/checkpoint-scratch/
