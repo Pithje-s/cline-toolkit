@@ -17,6 +17,7 @@ param(
     [string]$WorkflowsDir,
     [string]$SkillsDir,
     [string]$McpFile,
+    [switch]$AutoDetect,
     [switch]$DryRun
 )
 
@@ -73,18 +74,18 @@ if (-not [string]::IsNullOrWhiteSpace($ClineDir)) {
     $rWf    = [pscustomobject]@{ Path=(Join-Path $ClineDir 'workflows'); Reason='ClineDir задан явно' }
     $rSk    = [pscustomobject]@{ Path=(Join-Path $ClineDir 'skills'); Reason='ClineDir задан явно' }
     $mcpTarget = Join-Path $ClineDir 'data\settings\cline_mcp_settings.json'
-} else {
+} elseif ($AutoDetect) {
     $rRules = Resolve-Target -Override $RulesDir -Candidates @(
         (Join-Path $home86 'Documents\Cline\Rules'),
         (Join-Path $home86 '.clinerules\Rules'),
         (Join-Path $home86 '.cline\rules')
-    ) -HasSig $sigMd -DefaultNew (Join-Path $home86 'Documents\Cline\Rules') -Label 'rules'
+    ) -HasSig $sigMd -DefaultNew (Join-Path $home86 '.cline\rules') -Label 'rules'
 
     $rWf = Resolve-Target -Override $WorkflowsDir -Candidates @(
         (Join-Path $home86 'Documents\Cline\Workflows'),
         (Join-Path $home86 '.clinerules\workflows'),
         (Join-Path $home86 '.cline\workflows')
-    ) -HasSig $sigMd -DefaultNew (Join-Path $home86 'Documents\Cline\Workflows') -Label 'workflows'
+    ) -HasSig $sigMd -DefaultNew (Join-Path $home86 '.cline\workflows') -Label 'workflows'
 
     $rSk = Resolve-Target -Override $SkillsDir -Candidates @(
         (Join-Path $home86 '.cline\skills'),
@@ -93,6 +94,13 @@ if (-not [string]::IsNullOrWhiteSpace($ClineDir)) {
 
     if ($McpFile) { $mcpTarget = $McpFile }
     else { $mcpTarget = Join-Path $home86 '.cline\data\settings\cline_mcp_settings.json' }
+} else {
+    # Дефолт: ставим строго в ~/.cline, без угадывания и дублей
+    $cline = Join-Path $home86 '.cline'
+    $rRules = [pscustomobject]@{ Path=$cline; Reason='дефолт ~/.cline (плоско)' }
+    $rWf    = [pscustomobject]@{ Path=(Join-Path $cline 'workflows'); Reason='дефолт ~/.cline' }
+    $rSk    = [pscustomobject]@{ Path=(Join-Path $cline 'skills'); Reason='дефолт ~/.cline' }
+    $mcpTarget = Join-Path $cline 'data\settings\cline_mcp_settings.json'
 }
 
 Write-Host ""

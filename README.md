@@ -122,18 +122,21 @@ powershell.exe -ExecutionPolicy Bypass -File .\install.ps1
   Invoke-WebRequest -Uri 'https://github.com/Pithje-s/cline-toolkit/archive/refs/heads/main.zip' -OutFile "$env:TEMP\ct.zip"
   Expand-Archive -Path "$env:TEMP\ct.zip" -DestinationPath "$env:TEMP\cline-toolkit" -Force
 
-Шаг 2. Установи содержимое.
-- Проще всего запустить готовый установщик из репозитория:
+Шаг 2. Установи содержимое ОДНИМ из способов (не делай оба).
+
+Способ A (рекомендуемый): запусти готовый установщик. Он по умолчанию ставит всё
+строго в ~/.cline, без угадывания и дублей:
   powershell.exe -ExecutionPolicy Bypass -File "$repo\install.ps1"
-  Он сам разложит rules/ -> ~/.cline/, workflows/ -> ~/.cline/workflows/,
-  skills/ -> ~/.cline/skills/, mcp/ -> ~/.cline/data/settings/,
-  СОХРАНИТ существующий рабочий ключ Tavily из старого конфига и не тронет секреты.
-- Если install.ps1 не запускается, сделай то же вручную по схеме:
-    rules/*.md     -> ~/.cline/
-    workflows/*.md -> ~/.cline/workflows/
-    skills/*       -> ~/.cline/skills/   (рекурсивно, с подпапками)
-    mcp/cline_mcp_settings.json -> ~/.cline/data/settings/cline_mcp_settings.json
-  На Windows ~ = C:\Users\<USER> (переменная $HOME).
+
+Способ B (только если A не сработал): скопируй вручную строго в ~/.cline:
+  rules/*.md     -> ~/.cline/
+  workflows/*.md -> ~/.cline/workflows/
+  skills/*       -> ~/.cline/skills/   (рекурсивно)
+  mcp/cline_mcp_settings.json -> ~/.cline/data/settings/cline_mcp_settings.json
+На Windows ~ = C:\Users\<USER> (переменная $HOME).
+
+НЕ создавай дубли в Documents\Cline или .clinerules. Если install.ps1 случайно
+создаёт дубли (например, при явном -AutoDetect), удали их после установки.
 
 Требования безопасности (ОБЯЗАТЕЛЬНО):
 - НЕ вставляй и НЕ публикуй реальный API-ключ. В шаблоне ключ Tavily — это плейсхолдер
@@ -145,6 +148,7 @@ powershell.exe -ExecutionPolicy Bypass -File .\install.ps1
 Шаг 3. Проверь результат.
 - Выведи список установленных файлов и подтверди, что ключ Tavily либо остался
   плейсхолдером, либо был перенесён из старого конфига.
+- Убедись, что в ~/.cline/data/settings/cline_mcp_settings.json валидный JSON без BOM.
 - Удали временную папку $repo после установки.
 
 Шаг 4. Отчитайся: что установлено, сколько файлов, и нужен ли пользователю
