@@ -81,6 +81,13 @@ Copy-Item -Path .\skills\*       -Destination "$HOME\.cline\skills\" -Recurse -F
 Copy-Item -Path .\mcp\cline_mcp_settings.json -Destination "$HOME\.cline\data\settings\" -Force
 ```
 
+Либо запустите готовый скрипт — он делает то же самое и дополнительно
+**сохраняет существующий ключ Tavily** из старого конфига:
+
+```powershell
+powershell.exe -ExecutionPolicy Bypass -File .\install.ps1
+```
+
 ## Автоустановка через ИИ-агента (промпт)
 
 Не хотите раскладывать файлы руками? Скопируйте промпт ниже и отдайте его
