@@ -2,22 +2,51 @@
 .SYNOPSIS
     Установка cline-toolkit в глобальные каталоги Cline.
 .DESCRIPTION
-    Раскладывает rules/, workflows/, skills/ и mcp/ по глобальным папкам Cline
-    (~/.cline). Сохраняет существующий рабочий ключ Tavily из старого конфига,
-    не удаляет постороннее содержимое и не трогает секреты.
+    Раскладка целевых каталогов проверена по коду расширения Cline 4.1.x:
+
+      • глобальные правила  -> <Мои документы>\Cline\Rules
+      • глобальные воркфлоу  -> <Мои документы>\Cline\Workflows
+      • глобальные навыки    -> <CLINE_DIR>\skills   (по умолчанию ~/.cline/skills)
+      • MCP-настройки        -> <CLINE_DIR>\data\settings\cline_mcp_settings.json
+
+    Скиллы Cline дополнительно читает из ~/.agents/skills, правила и воркфлоу —
+    только из папки Cline в «Моих документах» (плоские *.md в ~/.cline и папка
+    ~/.cline/workflows современными версиями Cline НЕ читаются).
+
+    Скрипт сохраняет существующий рабочий ключ Tavily, не трогает посторонние
+    файлы, пишет JSON без BOM и (если не указан -KeepLegacyCopies) убирает
+    устаревшие копии, оставшиеся от прежних версий установщика — только те,
+    что побайтово совпадают с файлами репозитория.
 .EXAMPLE
     powershell.exe -ExecutionPolicy Bypass -File .\install.ps1
+.EXAMPLE
+    powershell.exe -ExecutionPolicy Bypass -File .\install.ps1 -DryRun
 .PARAMETER ClineDir
-    Целевой каталог .cline. По умолчанию — $HOME\.cline. Параметр для
-    тестирования и нестандартных расположений.
+    Каталог ~/.cline (по умолчанию $HOME\.cline или $env:CLINE_DIR).
+    Здесь живут skills/ и data/settings/.
+.PARAMETER DocumentsDir
+    Каталог «Мои документы» (по умолчанию — системный, или $env:CLINE_DOCUMENTS_DIR).
+.PARAMETER RulesDir
+    Override каталога глобальных правил (по умолчанию <DocumentsDir>\Cline\Rules).
+.PARAMETER WorkflowsDir
+    Override каталога глобальных воркфлоу (по умолчанию <DocumentsDir>\Cline\Workflows).
+.PARAMETER SkillsDir
+    Override каталога глобальных навыков (по умолчанию <ClineDir>\skills).
+.PARAMETER McpFile
+    Override пути cline_mcp_settings.json (по умолчанию <ClineDir>\data\settings\...).
+.PARAMETER KeepLegacyCopies
+    Не удалять устаревшие копии из ~/.cline (плоские *.md и ~/.cline/workflows).
+.PARAMETER DryRun
+    Показать план установки без записи на диск.
 #>
 param(
     [string]$ClineDir,
+    [string]$DocumentsDir,
     [string]$RulesDir,
     [string]$WorkflowsDir,
     [string]$SkillsDir,
     [string]$McpFile,
-    [switch]$AutoDetect,
+    [switch]$KeepLegacyCopies,
     [switch]$DryRun
 )
 
@@ -25,174 +54,199 @@ $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 
 $repoRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
-$home86  = $HOME
 
 function Write-Step($msg) { Write-Host "==> $msg" }
 function Write-Ok($msg)   { Write-Host "    [OK] $msg" }
+function Write-Info($msg) { Write-Host "    [i]  $msg" }
+function Write-Warn2($msg){ Write-Host "    [!]  $msg" -ForegroundColor Yellow }
+
+function Get-DocumentsDir {
+    if (-not [string]::IsNullOrWhiteSpace($env:CLINE_DOCUMENTS_DIR)) { return $env:CLINE_DOCUMENTS_DIR.Trim() }
+    try {
+        $p = [Environment]::GetFolderPath('MyDocuments')
+        if (-not [string]::IsNullOrWhiteSpace($p)) { return $p }
+    } catch { }
+    return (Join-Path $HOME 'Documents')
+}
+
+function Get-ClineDirPath {
+    if (-not [string]::IsNullOrWhiteSpace($ClineDir)) { return $ClineDir }
+    if (-not [string]::IsNullOrWhiteSpace($env:CLINE_DIR)) { return $env:CLINE_DIR.Trim() }
+    return (Join-Path $HOME '.cline')
+}
+
+function Test-SamePath {
+    param([string]$A, [string]$B)
+    if ([string]::IsNullOrWhiteSpace($A) -or [string]::IsNullOrWhiteSpace($B)) { return $false }
+    try {
+        $a = [IO.Path]::GetFullPath($A).TrimEnd('\', '/')
+        $b = [IO.Path]::GetFullPath($B).TrimEnd('\', '/')
+        return [string]::Equals($a, $b, [StringComparison]::OrdinalIgnoreCase)
+    } catch { return $false }
+}
+
 
 Write-Step " cline-toolkit installer"
-Write-Host "     repo:  $repoRoot"
-Write-Host "     home:  $home86"
+Write-Host "     repo:      $repoRoot"
+Write-Host "     home:      $HOME"
+Write-Host "     cline dir: $(Get-ClineDirPath)"
 Write-Host ""
 
-# 1. Проверка исходных папок
+# 1. Проверка исходников
 $src = @{
     rules     = Join-Path $repoRoot 'rules'
     workflows = Join-Path $repoRoot 'workflows'
     skills    = Join-Path $repoRoot 'skills'
     mcpFile   = Join-Path $repoRoot 'mcp\cline_mcp_settings.json'
 }
-foreach ($k in $src.Keys) {
-    if (-not (Test-Path $src[$k])) { throw "Не найден источник '$k': $($src[$k])" }
+foreach ($k in @('rules','workflows','skills','mcpFile')) {
+    if (-not (Test-Path -LiteralPath $src[$k])) { throw "Не найден источник '$k': $($src[$k])" }
 }
 
-# 2. Определение целевых расположений (автодетект)
-$sigMd = { param($p) (Get-ChildItem -Path $p -Filter '*.md' -File -ErrorAction SilentlyContinue | Measure-Object).Count -gt 0 }
-$sigSkills = { param($p) (Get-ChildItem -Path $p -Directory -ErrorAction SilentlyContinue | Where-Object { Test-Path (Join-Path $_.FullName 'SKILL.md') } | Measure-Object).Count -gt 0 }
+# 2. Целевые каталоги
+$cline     = Get-ClineDirPath
+$documents = if (-not [string]::IsNullOrWhiteSpace($DocumentsDir)) { $DocumentsDir } else { Get-DocumentsDir }
+$clineDocs = Join-Path $documents 'Cline'
 
-function Resolve-Target {
-    param([string]$Override,[string[]]$Candidates,[scriptblock]$HasSig,[string]$DefaultNew,[string]$Label)
-    if ($Override) { return [pscustomobject]@{ Path=$Override; Reason='задан явно (override)' } }
-    $best = $null; $bestScore = -1; $bestHas = $false
-    foreach ($c in $Candidates) {
-        if (-not (Test-Path $c)) { continue }
-        $has = & $HasSig $c
-        $score = 10
-        if ($has) { $score += 100 }
-        if ($score -gt $bestScore) { $bestScore = $score; $best = $c; $bestHas = $has }
-    }
-    if ($null -eq $best) {
-        return [pscustomobject]@{ Path=$DefaultNew; Reason='нет существующих папок — создаю по умолчанию' }
-    }
-    if ($bestHas) { $reason = "существующая папка с файлами $Label" }
-    else { $reason = "существующая папка (пока без файлов $Label)" }
-    return [pscustomobject]@{ Path=$best; Reason=$reason }
-}
+$rulesTarget     = if (-not [string]::IsNullOrWhiteSpace($RulesDir))     { $RulesDir }     else { Join-Path $clineDocs 'Rules' }
+$workflowsTarget = if (-not [string]::IsNullOrWhiteSpace($WorkflowsDir)) { $WorkflowsDir } else { Join-Path $clineDocs 'Workflows' }
+$skillsTarget    = if (-not [string]::IsNullOrWhiteSpace($SkillsDir))    { $SkillsDir }    else { Join-Path $cline 'skills' }
+$mcpTarget       = if (-not [string]::IsNullOrWhiteSpace($McpFile))      { $McpFile }      else { Join-Path $cline 'data\settings\cline_mcp_settings.json' }
 
-if (-not [string]::IsNullOrWhiteSpace($ClineDir)) {
-    $rRules = [pscustomobject]@{ Path=$ClineDir; Reason='ClineDir задан явно' }
-    $rWf    = [pscustomobject]@{ Path=(Join-Path $ClineDir 'workflows'); Reason='ClineDir задан явно' }
-    $rSk    = [pscustomobject]@{ Path=(Join-Path $ClineDir 'skills'); Reason='ClineDir задан явно' }
-    $mcpTarget = Join-Path $ClineDir 'data\settings\cline_mcp_settings.json'
-} elseif ($AutoDetect) {
-    $rRules = Resolve-Target -Override $RulesDir -Candidates @(
-        (Join-Path $home86 'Documents\Cline\Rules'),
-        (Join-Path $home86 '.clinerules\Rules'),
-        (Join-Path $home86 '.cline\rules')
-    ) -HasSig $sigMd -DefaultNew (Join-Path $home86 '.cline\rules') -Label 'rules'
+# Устаревшие (нечитаемые Cline 4.1.x) места, куда ставили прежние версии установщика
+$legacyRulesDir     = $cline
+$legacyWorkflowsDir = Join-Path $cline 'workflows'
 
-    $rWf = Resolve-Target -Override $WorkflowsDir -Candidates @(
-        (Join-Path $home86 'Documents\Cline\Workflows'),
-        (Join-Path $home86 '.clinerules\workflows'),
-        (Join-Path $home86 '.cline\workflows')
-    ) -HasSig $sigMd -DefaultNew (Join-Path $home86 '.cline\workflows') -Label 'workflows'
-
-    $rSk = Resolve-Target -Override $SkillsDir -Candidates @(
-        (Join-Path $home86 '.cline\skills'),
-        (Join-Path $home86 '.clinerules\skills')
-    ) -HasSig $sigSkills -DefaultNew (Join-Path $home86 '.cline\skills') -Label 'skills'
-
-    if ($McpFile) { $mcpTarget = $McpFile }
-    else { $mcpTarget = Join-Path $home86 '.cline\data\settings\cline_mcp_settings.json' }
-} else {
-    # Дефолт: ставим строго в ~/.cline, без угадывания и дублей
-    $cline = Join-Path $home86 '.cline'
-    $rRules = [pscustomobject]@{ Path=$cline; Reason='дефолт ~/.cline (плоско)' }
-    $rWf    = [pscustomobject]@{ Path=(Join-Path $cline 'workflows'); Reason='дефолт ~/.cline' }
-    $rSk    = [pscustomobject]@{ Path=(Join-Path $cline 'skills'); Reason='дефолт ~/.cline' }
-    $mcpTarget = Join-Path $cline 'data\settings\cline_mcp_settings.json'
-}
-
-Write-Host ""
-Write-Step "Обнаруженные расположения:"
-Write-Host ("     rules     -> {0}  [{1}]" -f $rRules.Path, $rRules.Reason)
-Write-Host ("     workflows -> {0}  [{1}]" -f $rWf.Path, $rWf.Reason)
-Write-Host ("     skills    -> {0}  [{1}]" -f $rSk.Path, $rSk.Reason)
+Write-Step "Целевые расположения:"
+Write-Host ("     rules     -> {0}" -f $rulesTarget)
+Write-Host ("     workflows -> {0}" -f $workflowsTarget)
+Write-Host ("     skills    -> {0}" -f $skillsTarget)
 Write-Host ("     mcp       -> {0}" -f $mcpTarget)
 Write-Host ""
 
-# Создание целевых папок (кроме dry-run)
 if (-not $DryRun) {
-    foreach ($d in @($rRules.Path, $rWf.Path, $rSk.Path, (Split-Path -Parent $mcpTarget))) {
+    foreach ($d in @($rulesTarget, $workflowsTarget, $skillsTarget, (Split-Path -Parent $mcpTarget))) {
         if (-not [string]::IsNullOrWhiteSpace($d)) { New-Item -ItemType Directory -Force -Path $d | Out-Null }
     }
 }
 
-# 3. rules/*.md
+function Remove-LegacyCopy {
+    param([string]$Path, [string]$SourceHash, [string]$Label)
+    if (-not (Test-Path -LiteralPath $Path)) { return }
+    $h = (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash
+    if ($h -ne $SourceHash) {
+        Write-Info ("оставлен (изменён вручную, не трогаю): {0}" -f $Path)
+        return
+    }
+    if (-not $DryRun) { Remove-Item -LiteralPath $Path -Force }
+    if ($DryRun) {
+        Write-Info ("будет удалена устаревшая копия ({0}): {1}" -f $Label, $Path)
+    } else {
+        Write-Ok ("устаревшая копия удалена ({0}): {1}" -f $Label, $Path)
+    }
+}
+
+# 3. rules/*.md -> <Documents>\Cline\Rules
 $rulesCount = 0
 Get-ChildItem -Path $src['rules'] -Filter '*.md' -File | ForEach-Object {
-    if (-not $DryRun) { Copy-Item -Path $_.FullName -Destination $rRules.Path -Force }
+    $hash = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash
+    if (-not $DryRun) {
+        Copy-Item -LiteralPath $_.FullName -Destination (Join-Path $rulesTarget $_.Name) -Force
+    }
     $rulesCount++
+    if (-not $KeepLegacyCopies -and -not (Test-SamePath $legacyRulesDir $rulesTarget)) {
+        Remove-LegacyCopy -Path (Join-Path $legacyRulesDir $_.Name) -SourceHash $hash -Label 'rules (плоско в ~/.cline)'
+    }
 }
-Write-Ok ("rules: {0} -> {1}{2}" -f $rulesCount, $rRules.Path, $(if ($DryRun) { ' (dry-run)' } else { '' }))
+Write-Ok ("rules: {0} файлов -> {1}{2}" -f $rulesCount, $rulesTarget, $(if ($DryRun) { ' (dry-run)' } else { '' }))
 
-# 4. workflows/*.md
+# 4. workflows/*.md -> <Documents>\Cline\Workflows
 $wfCount = 0
 Get-ChildItem -Path $src['workflows'] -Filter '*.md' -File | ForEach-Object {
-    if (-not $DryRun) { Copy-Item -Path $_.FullName -Destination $rWf.Path -Force }
-    $wfCount++
-}
-Write-Ok ("workflows: {0} -> {1}{2}" -f $wfCount, $rWf.Path, $(if ($DryRun) { ' (dry-run)' } else { '' }))
-
-# 5. skills/* (рекурсивно)
-if (-not $DryRun) {
-    Copy-Item -Path (Join-Path $src['skills'] '*') -Destination $rSk.Path -Recurse -Force
-}
-$skillsCount = (Get-ChildItem -Path $src['skills'] -Directory).Count
-Write-Ok ("skills: {0} папок -> {1}{2}" -f $skillsCount, $rSk.Path, $(if ($DryRun) { ' (dry-run)' } else { '' }))
-
-# 6. MCP: сохранить существующий ключ Tavily
-$existingKey = $null
-if (Test-Path $mcpTarget) {
-    try {
-        $old = Get-Content -Path $mcpTarget -Raw | ConvertFrom-Json
-        $candidate = $old.mcpServers.tavily.url
-        if ($candidate -and $candidate -match 'tavilyApiKey=([^&]+)') {
-            $k = $Matches[1]
-            if ($k -and $k -ne 'YOUR_TAVILY_API_KEY') { $existingKey = $k }
-        }
-    } catch { Write-Host "    [i] Старый MCP-конфиг не распарсен, беру шаблон" }
-}
-
-if (-not $DryRun) {
-    Copy-Item -Path $src['mcpFile'] -Destination $mcpTarget -Force
-    if ($existingKey) {
-        $raw = Get-Content -Path $mcpTarget -Raw
-        $raw = $raw -replace 'YOUR_TAVILY_API_KEY', $existingKey
-        $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
-        [System.IO.File]::WriteAllText($mcpTarget, $raw, $utf8NoBom)
-        Write-Ok "MCP обновлён, СУЩЕСТВУЮЩИЙ ключ Tavily сохранён"
-        $keyNeeded = $false
-    } else {
-        $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
-        $rawTemplate = [System.IO.File]::ReadAllText($src['mcpFile'])
-        [System.IO.File]::WriteAllText($mcpTarget, $rawTemplate, $utf8NoBom)
-        Write-Ok "MCP установлен из шаблона (ключ Tavily — плейсхолдер)"
-        $keyNeeded = $true
+    $hash = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash
+    if (-not $DryRun) {
+        Copy-Item -LiteralPath $_.FullName -Destination (Join-Path $workflowsTarget $_.Name) -Force
     }
+    $wfCount++
+    if (-not $KeepLegacyCopies -and -not (Test-SamePath $legacyWorkflowsDir $workflowsTarget)) {
+        Remove-LegacyCopy -Path (Join-Path $legacyWorkflowsDir $_.Name) -SourceHash $hash -Label 'workflows (~/.cline/workflows)'
+    }
+}
+Write-Ok ("workflows: {0} файлов -> {1}{2}" -f $wfCount, $workflowsTarget, $(if ($DryRun) { ' (dry-run)' } else { '' }))
 
-    $bytes = [System.IO.File]::ReadAllBytes($mcpTarget)
+# 4a. Убрать пустой устаревший каталог ~/.cline/workflows
+if (-not $KeepLegacyCopies -and -not (Test-SamePath $legacyWorkflowsDir $workflowsTarget) -and (Test-Path -LiteralPath $legacyWorkflowsDir)) {
+    $rest = @(Get-ChildItem -LiteralPath $legacyWorkflowsDir -Force -ErrorAction SilentlyContinue)
+    if ($rest.Count -eq 0) {
+        if (-not $DryRun) { Remove-Item -LiteralPath $legacyWorkflowsDir -Force }
+        if ($DryRun) {
+            Write-Info ("пустой устаревший каталог будет удалён: {0}" -f $legacyWorkflowsDir)
+        } else {
+            Write-Ok ("пустой устаревший каталог удалён: {0}" -f $legacyWorkflowsDir)
+        }
+    } else {
+        Write-Info ("в {0} остались посторонние файлы — каталог оставлен" -f $legacyWorkflowsDir)
+    }
+}
+
+# 5. skills/* -> <ClineDir>\skills (рекурсивно, ничего не удаляя)
+if (-not $DryRun) {
+    Copy-Item -Path (Join-Path $src['skills'] '*') -Destination $skillsTarget -Recurse -Force
+}
+$skillsCount = @(Get-ChildItem -Path $src['skills'] -Directory).Count
+$skillFiles  = @(Get-ChildItem -Path $src['skills'] -Recurse -File).Count
+Write-Ok ("skills: {0} папок / {1} файлов -> {2}{3}" -f $skillsCount, $skillFiles, $skillsTarget, $(if ($DryRun) { ' (dry-run)' } else { '' }))
+
+# 6. MCP: сохранить существующий рабочий ключ Tavily
+$existingKey = $null
+if (Test-Path -LiteralPath $mcpTarget) {
+    try {
+        $old = Get-Content -LiteralPath $mcpTarget -Raw | ConvertFrom-Json
+        $url = $old.mcpServers.tavily.url
+        if ($url -and $url -match 'tavilyApiKey=([^&"]+)') {
+            $candidate = $Matches[1].Trim()
+            if ($candidate -and $candidate -ne 'YOUR_TAVILY_API_KEY') { $existingKey = $candidate }
+        }
+    } catch {
+        Write-Info "старый MCP-конфиг не распарсен — беру шаблон"
+    }
+}
+
+$mcpRaw = [IO.File]::ReadAllText($src['mcpFile'])
+if ($existingKey) { $mcpRaw = $mcpRaw -replace 'YOUR_TAVILY_API_KEY', $existingKey }
+
+if (-not $DryRun) {
+    $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+    [IO.File]::WriteAllText($mcpTarget, $mcpRaw, $utf8NoBom)
+
+    $bytes = [IO.File]::ReadAllBytes($mcpTarget)
     $hasBom = ($bytes.Length -ge 3 -and $bytes[0] -eq 0xEF -and $bytes[1] -eq 0xBB -and $bytes[2] -eq 0xBF)
     if ($hasBom) { throw "MCP JSON записан с BOM: $mcpTarget" }
-    Get-Content -LiteralPath $mcpTarget -Raw | ConvertFrom-Json | Out-Null
+    [IO.File]::ReadAllText($mcpTarget) | ConvertFrom-Json | Out-Null
+}
+
+if ($existingKey) {
+    Write-Ok "mcp: существующий ключ Tavily сохранён"
+    $keyNeeded = $false
 } else {
-    $keyNeeded = (-not $existingKey)
-    Write-Ok ("mcp -> {0} (dry-run)" -f $mcpTarget)
+    Write-Ok "mcp: установлен из шаблона (ключ Tavily — плейсхолдер)"
+    $keyNeeded = $true
 }
 
 # 7. Итоговый отчёт
 Write-Host ""
 if ($DryRun) {
     Write-Step "Проверка завершена (dry-run, файлы не записаны)"
-    Write-Host ("     Будет скопировано: rules {0}, workflows {1}, skills {2} папок" -f $rulesCount, $wfCount, $skillsCount)
 } else {
     Write-Step "Установка завершена"
-    $installed = (Get-ChildItem -Path $rRules.Path -File -Filter '*.md' -ErrorAction SilentlyContinue | Measure-Object).Count `
-               + (Get-ChildItem -Path $rWf.Path -File -Filter '*.md' -ErrorAction SilentlyContinue | Measure-Object).Count `
-               + (Get-ChildItem -Path $rSk.Path -Recurse -File -Filter 'SKILL.md' -ErrorAction SilentlyContinue | Measure-Object).Count
-    Write-Host "     Всего файлов правил/воркфлоу/скиллов: $installed"
+    $installed = 0
+    $installed += @(Get-ChildItem -Path $rulesTarget -File -Filter '*.md' -ErrorAction SilentlyContinue).Count
+    $installed += @(Get-ChildItem -Path $workflowsTarget -File -Filter '*.md' -ErrorAction SilentlyContinue).Count
+    $installed += @(Get-ChildItem -Path $skillsTarget -Recurse -File -Filter 'SKILL.md' -ErrorAction SilentlyContinue).Count
+    Write-Host "     Файлов правил/воркфлоу/SKILL.md в целевых каталогах: $installed"
+    Write-Host "     Cline 4.1.x читает: Rules/Workflows из $clineDocs, навыки из $skillsTarget"
 }
 if ($keyNeeded) {
-    Write-Host "     ВНИМАНИЕ: укажите ключ Tavily в $mcpTarget" -ForegroundColor Yellow
+    Write-Warn2 "укажите ключ Tavily в $mcpTarget (вместо YOUR_TAVILY_API_KEY)"
 }
 Write-Host "     Перезапустите Cline, чтобы он подхватил изменения." -ForegroundColor Cyan

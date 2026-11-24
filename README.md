@@ -1,6 +1,6 @@
 # cline-toolkit
 
-![version](https://img.shields.io/badge/version-0.1.0-blue)
+![version](https://img.shields.io/badge/version-0.2.0-blue)
 ![license](https://img.shields.io/badge/license-MIT-green)
 ![validator](https://img.shields.io/badge/validate-run%20validate.ps1-informational)
 ![CI](https://github.com/Pithje-s/cline-toolkit/actions/workflows/validate.yml/badge.svg)
@@ -8,7 +8,7 @@
 Единый репозиторий для конфигурации Cline: правила, навыки, воркфлоу и MCP-настройки.
 Соберите один раз — используйте во всех проектах и делитесь с командой.
 
-> Текущая версия: **v0.1.0**. История изменений — в [CHANGELOG.md](CHANGELOG.md),
+> Текущая версия: **v0.2.0**. История изменений — в [CHANGELOG.md](CHANGELOG.md),
 > полный справочник по компонентам — в [CATALOG.md](CATALOG.md),
 > как вносить вклад — в [CONTRIBUTING.md](CONTRIBUTING.md).
 
@@ -72,12 +72,18 @@
 
 | Слой | Глобально (все проекты) | В проекте (team-shared) |
 |---|---|---|
-| Правила | `~/.cline/` (напрямую) или `Documents/Cline/Rules` | `.clinerules/` или `.cline/rules/` |
-| Воркфлоу | `~/.cline/workflows/` | `.clinerules/workflows/` |
-| Навыки | `~/.cline/skills/` | `.cline/skills/` (рекомендуется), `.clinerules/skills/` |
+| Правила | `Documents/Cline/Rules` | `.clinerules/` или `.cline/rules/` |
+| Воркфлоу | `Documents/Cline/Workflows` | `.clinerules/workflows/` |
+| Навыки | `~/.cline/skills/` или `~/.agents/skills/` | `.cline/skills/` (рекомендуется), `.clinerules/skills/` |
 | MCP-настройки | `~/.cline/data/settings/cline_mcp_settings.json` | — (через настройки workspace) |
 
-На Windows `~` = `C:\Users\<USERNAME>`.
+На Windows `~` = `C:\Users\<USERNAME>`, а `Documents` — системная папка «Мои документы»
+(может быть перенаправлена в OneDrive; Cline берёт её через `MyDocuments`).
+
+> **Важно (проверено по коду расширения Cline 4.1.x).** Глобальные правила и воркфлоу
+> Cline читает **только** из `Documents/Cline/Rules` и `Documents/Cline/Workflows`.
+> Плоские `*.md` в `~/.cline/` и `~/.cline/workflows/` современные версии **не читают** —
+> там живут только `skills/` и `data/`.
 
 > Cline также читает старый формат `.clinerules/` (с подпапками `workflows/`,
 > `skills/`, `hooks/`) и `AGENTS.md` в корне проекта — для обратной
@@ -87,8 +93,9 @@
 
 ```powershell
 # из корня склонированного репозитория
-Copy-Item -Path .\rules\*.md     -Destination "$HOME\.cline\" -Force
-Copy-Item -Path .\workflows\*.md -Destination "$HOME\.cline\workflows\" -Force
+$clineDocs = Join-Path ([Environment]::GetFolderPath('MyDocuments')) 'Cline'
+Copy-Item -Path .\rules\*.md     -Destination "$clineDocs\Rules\" -Force
+Copy-Item -Path .\workflows\*.md -Destination "$clineDocs\Workflows\" -Force
 Copy-Item -Path .\skills\*       -Destination "$HOME\.cline\skills\" -Recurse -Force
 Copy-Item -Path .\mcp\cline_mcp_settings.json -Destination "$HOME\.cline\data\settings\" -Force
 ```
@@ -124,19 +131,24 @@ powershell.exe -ExecutionPolicy Bypass -File .\install.ps1
 
 Шаг 2. Установи содержимое ОДНИМ из способов (не делай оба).
 
-Способ A (рекомендуемый): запусти готовый установщик. Он по умолчанию ставит всё
-строго в ~/.cline, без угадывания и дублей:
-  powershell.exe -ExecutionPolicy Bypass -File "$repo\install.ps1"
-
-Способ B (только если A не сработал): скопируй вручную строго в ~/.cline:
-  rules/*.md     -> ~/.cline/
-  workflows/*.md -> ~/.cline/workflows/
+Способ A (рекомендуемый): запусти готовый установщик. Он раскладывает файлы в
+канонические глобальные каталоги Cline 4.1.x (без угадывания и дублей):
+  rules/*.md     -> <Мои документы>\Cline\Rules
+  workflows/*.md -> <Мои документы>\Cline\Workflows
   skills/*       -> ~/.cline/skills/   (рекурсивно)
   mcp/cline_mcp_settings.json -> ~/.cline/data/settings/cline_mcp_settings.json
-На Windows ~ = C:\Users\<USER> (переменная $HOME).
+  powershell.exe -ExecutionPolicy Bypass -File "$repo\install.ps1"
 
-НЕ создавай дубли в Documents\Cline или .clinerules. Если install.ps1 случайно
-создаёт дубли (например, при явном -AutoDetect), удали их после установки.
+Способ B (только если A не сработал): скопируй вручную в те же каталоги:
+  rules/*.md     -> Documents\Cline\Rules
+  workflows/*.md -> Documents\Cline\Workflows
+  skills/*       -> ~/.cline/skills/   (рекурсивно)
+  mcp/cline_mcp_settings.json -> ~/.cline/data/settings/cline_mcp_settings.json
+На Windows ~ = C:\Users\<USER> (переменная $HOME), Documents = «Мои документы».
+
+НЕ клади правила и воркфлоу плоско в ~/.cline — Cline 4.1.x их там не читает.
+Если install.ps1 обнаруживает такие копии от прежних версий, он удаляет их только
+при побайтовом совпадении с файлами репозитория (изменённые вручную не трогает).
 
 Требования безопасности (ОБЯЗАТЕЛЬНО):
 - НЕ вставляй и НЕ публикуй реальный API-ключ. В шаблоне ключ Tavily — это плейсхолдер
@@ -271,7 +283,7 @@ pull request. Чем универсальнее и качественнее ко
 
 Совет: если адаптируете под команду — сделайте отдельную ветку конфигурации в
 своём репозитории и подключайте её как проектные `.cline/`, а не правьте глобальные
-`~/.cline/` напрямую (см. таблицу путей в разделе «Установка»).
+`Documents/Cline/` и `~/.cline/skills/` напрямую (см. таблицу путей в разделе «Установка»).
 
 ## Лицензия
 

@@ -6,6 +6,8 @@
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-24
+
 ### Добавлено
 - `CATALOG.md` — полный справочник по каждому правилу, навыку, воркфлоу и MCP-серверу.
 - `validate.ps1` — инженерная валидация: frontmatter skills/workflows, JSON MCP и `config.example.json`, поиск секретов, CJK, **дублей заголовков/строк** и **потенциальных противоречий** (WARN).
@@ -16,7 +18,12 @@
 - Мета-правило верхнего уровня против Prompt Injection в `rules/01-core.md`.
 
 ### Изменено
-- `install.ps1` теперь по умолчанию устанавливает всё строго в `~/.cline` (без угадывания и дублей). Автодетект доступен только по явному флагу `-AutoDetect`. Добавлены `-DryRun` и override-параметры (`-RulesDir`, `-WorkflowsDir`, `-SkillsDir`, `-McpFile`).
+- `install.ps1` раскладывает файлы по каноническим глобальным каталогам Cline 4.1.x: `rules/` → `<Мои документы>\Cline\Rules`, `workflows/` → `<Мои документы>\Cline\Workflows`, `skills/` → `~/.cline/skills`, MCP → `~/.cline/data/settings/cline_mcp_settings.json`. Поддерживаются `-DryRun` и override-параметры (`-ClineDir`, `-DocumentsDir`, `-RulesDir`, `-WorkflowsDir`, `-SkillsDir`, `-McpFile`, `-KeepLegacyCopies`).
+- `README.md`: таблица путей и промпт автоустановки приведены к фактической раскладке Cline 4.1.x.
+
+### Исправлено
+- Глобальные правила и воркфлоу больше не устанавливаются плоско в `~/.cline`: Cline 4.1.x читает их только из `Documents\Cline\Rules` и `Documents\Cline\Workflows` (проверено по `dist/extension.js`: `ensureRulesDirectoryExists`, `ensureWorkflowsDirectoryExists`, `getSkillsDirectoriesForScan`). Из-за прежней раскладки после перезапуска подхватывался только MCP.
+- `install.ps1` убирает устаревшие копии прежней раскладки (плоские `*.md` в `~/.cline`, `~/.cline/workflows/*.md`) только при побайтовом совпадении с файлами репозитория; изменённые вручную и посторонние файлы сохраняются.
 - Политика безопасности MCP-серверов (защита от Shadow IT) в `rules/02-quality-git.md`.
 - Промпт автоустановки для ИИ-агента и раздел «Адаптация под себя и вклад» в `README.md`.
 
@@ -31,5 +38,6 @@
 - `install.ps1` — установка в глобальные каталоги Cline с сохранением ключа Tavily.
 - `LICENSE` (MIT), `.gitignore`, `README.md`.
 
-[Unreleased]: https://github.com/Pithje-s/cline-toolkit/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/Pithje-s/cline-toolkit/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/Pithje-s/cline-toolkit/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/Pithje-s/cline-toolkit/releases/tag/v0.1.0
