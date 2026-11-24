@@ -75,16 +75,16 @@ if (-not [string]::IsNullOrWhiteSpace($ClineDir)) {
     $mcpTarget = Join-Path $ClineDir 'data\settings\cline_mcp_settings.json'
 } else {
     $rRules = Resolve-Target -Override $RulesDir -Candidates @(
-        (Join-Path $home86 '.clinerules\Rules'),
         (Join-Path $home86 'Documents\Cline\Rules'),
+        (Join-Path $home86 '.clinerules\Rules'),
         (Join-Path $home86 '.cline\rules')
-    ) -HasSig $sigMd -DefaultNew (Join-Path $home86 '.clinerules\Rules') -Label 'rules'
+    ) -HasSig $sigMd -DefaultNew (Join-Path $home86 'Documents\Cline\Rules') -Label 'rules'
 
     $rWf = Resolve-Target -Override $WorkflowsDir -Candidates @(
+        (Join-Path $home86 'Documents\Cline\Workflows'),
         (Join-Path $home86 '.clinerules\workflows'),
-        (Join-Path $home86 '.cline\workflows'),
-        (Join-Path $home86 'Documents\Cline\Workflows')
-    ) -HasSig $sigMd -DefaultNew (Join-Path $home86 '.clinerules\workflows') -Label 'workflows'
+        (Join-Path $home86 '.cline\workflows')
+    ) -HasSig $sigMd -DefaultNew (Join-Path $home86 'Documents\Cline\Workflows') -Label 'workflows'
 
     $rSk = Resolve-Target -Override $SkillsDir -Candidates @(
         (Join-Path $home86 '.cline\skills'),
