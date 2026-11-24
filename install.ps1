@@ -151,13 +151,22 @@ if (-not $DryRun) {
     if ($existingKey) {
         $raw = Get-Content -Path $mcpTarget -Raw
         $raw = $raw -replace 'YOUR_TAVILY_API_KEY', $existingKey
-        Set-Content -Path $mcpTarget -Value $raw -Encoding UTF8 -NoNewline
+        $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+        [System.IO.File]::WriteAllText($mcpTarget, $raw, $utf8NoBom)
         Write-Ok "MCP обновлён, СУЩЕСТВУЮЩИЙ ключ Tavily сохранён"
         $keyNeeded = $false
     } else {
+        $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+        $rawTemplate = [System.IO.File]::ReadAllText($src['mcpFile'])
+        [System.IO.File]::WriteAllText($mcpTarget, $rawTemplate, $utf8NoBom)
         Write-Ok "MCP установлен из шаблона (ключ Tavily — плейсхолдер)"
         $keyNeeded = $true
     }
+
+    $bytes = [System.IO.File]::ReadAllBytes($mcpTarget)
+    $hasBom = ($bytes.Length -ge 3 -and $bytes[0] -eq 0xEF -and $bytes[1] -eq 0xBB -and $bytes[2] -eq 0xBF)
+    if ($hasBom) { throw "MCP JSON записан с BOM: $mcpTarget" }
+    Get-Content -LiteralPath $mcpTarget -Raw | ConvertFrom-Json | Out-Null
 } else {
     $keyNeeded = (-not $existingKey)
     Write-Ok ("mcp -> {0} (dry-run)" -f $mcpTarget)
