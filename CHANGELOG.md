@@ -14,6 +14,9 @@
 - `mcp/SECURITY.md` — чек-лист аудита MCP-сервера перед подключением (источник, права, секреты, allowlist).
 - `config.example.json` — advisory-параметры (язык, лимит попыток, пороги плана, allowlist) + env-соглашения.
 - Мета-правило верхнего уровня против Prompt Injection в `rules/01-core.md`.
+
+### Изменено
+- `install.ps1` теперь **автоматически определяет** расположение rules/workflows/skills/mcp на машине (по стандартным точкам Cline: `~/.cline/`, `~/Documents/Cline/`, `~/.clinerules/`), выбирает папку с существующими файлами и печатает отчёт. Добавлены `-DryRun` и override-параметры (`-RulesDir`, `-WorkflowsDir`, `-SkillsDir`, `-McpFile`).
 - Политика безопасности MCP-серверов (защита от Shadow IT) в `rules/02-quality-git.md`.
 - Промпт автоустановки для ИИ-агента и раздел «Адаптация под себя и вклад» в `README.md`.
 
