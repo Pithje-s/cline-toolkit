@@ -1,0 +1,13 @@
+# Secrets — никогда не коммитить
+.env
+.env.*
+*.key
+*.pem
+secrets.json
+cline_mcp_settings.local.json
+
+# Локальные конфиги с реальными ключами
+mcp/*.local.json
+**/_listing.txt
+**/_build.log
+**/_build.ps1

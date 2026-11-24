@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "tavily": {
+      "type": "streamableHttp",
+      "url": "https://mcp.tavily.com/mcp/?tavilyApiKey=YOUR_TAVILY_API_KEY",
+      "disabled": false,
+      "autoApprove": []
+    }
+  }
+}
