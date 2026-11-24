@@ -34,9 +34,21 @@ Write-Host ""
 Write-Host ("RESULT: total={0} passed={1} failed={2} skipped={3}" -f $total, $passed, $failed, $skipped)
 
 if ($failed -gt 0) {
-    foreach ($t in @($result.TestResult)) {
-        if ($t.Passed -eq $false) {
-            Write-Host ("FAILED: {0}`n        {1}" -f $t.Name, $t.FailureMessage) -ForegroundColor Red
+    # Pester 5 отдаёт упавшие блоки в .Failed, Pester 3 — в .TestResult
+    $failedItems = @()
+    if ($result.PSObject.Properties.Name -contains 'Failed') { $failedItems = @($result.Failed) }
+    if ($failedItems.Count -gt 0) {
+        foreach ($f in $failedItems) {
+            Write-Host ("FAILED: {0}" -f $f.ExpandedPath) -ForegroundColor Red
+            foreach ($e in @($f.ErrorRecord)) {
+                Write-Host ("        " + $e.Exception.Message) -ForegroundColor Red
+            }
+        }
+    } else {
+        foreach ($t in @($result.TestResult)) {
+            if ($t.Passed -eq $false) {
+                Write-Host ("FAILED: {0}`n        {1}" -f $t.Name, $t.FailureMessage) -ForegroundColor Red
+            }
         }
     }
     exit 1

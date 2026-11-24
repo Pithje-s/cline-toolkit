@@ -1,97 +1,21 @@
 ﻿#requires -Version 5.1
 <#
     Тесты установщика cline-toolkit.
-    Ассерты — через throw, поэтому набор работает и на Pester 3.x (Windows PowerShell),
-    и на Pester 5.x (CI). Реальные каталоги Cline не используются: каждый тест
+
+    Хелперы живут в модуле tests/lib/TestHelpers.psm1: Pester 5 выполняет блоки It
+    в отдельной области видимости, поэтому функции и переменные из шапки файла там
+    недоступны (CommandNotFoundException). Ассерты — через throw, набор работает
+    на Pester 3.x и 5.x. Реальные каталоги Cline не используются: каждый тест
     работает в собственном временном каталоге.
 #>
 
-$script:repoRoot        = Split-Path -Parent $PSScriptRoot
-$script:installScript   = Join-Path $script:repoRoot 'install.ps1'
-$script:uninstallScript = Join-Path $script:repoRoot 'uninstall.ps1'
-$script:testKey         = 'tvly-' + 'TESTKEY0000'
-
-function Assert-True {
-    param([bool]$Condition, [string]$Message)
-    if (-not $Condition) { throw $Message }
-}
-
-function New-TestEnv {
-    $root = Join-Path ([IO.Path]::GetTempPath()) ('cline-toolkit-test-' + [Guid]::NewGuid().ToString('N'))
-    New-Item -ItemType Directory -Force -Path $root | Out-Null
-    $env = @{
-        Root      = $root
-        ClineDir  = Join-Path $root '.cline'
-        Documents = Join-Path $root 'Documents'
-        Rules     = Join-Path $root 'Documents\Cline\Rules'
-        Workflows = Join-Path $root 'Documents\Cline\Workflows'
-        Skills    = Join-Path $root '.cline\skills'
-        McpFile   = Join-Path $root '.cline\data\settings\cline_mcp_settings.json'
-        Manifest  = Join-Path $root '.cline\.cline-toolkit-manifest.json'
-    }
-    New-Item -ItemType Directory -Force -Path (Split-Path -Parent $env.McpFile) | Out-Null
-    return $env
-}
-
-function Remove-TestEnv {
-    param($Env)
-    if ($Env -and (Test-Path -LiteralPath $Env.Root)) {
-        Remove-Item -LiteralPath $Env.Root -Recurse -Force -ErrorAction SilentlyContinue
-    }
-}
-
-function Write-JsonFile {
-    param([string]$Path, $Object)
-    $json = $Object | ConvertTo-Json -Depth 20
-    [IO.File]::WriteAllText($Path, $json, (New-Object System.Text.UTF8Encoding($false)))
-}
-
-function Invoke-Install {
-    param($Env, [switch]$DryRun, [switch]$NoPrune)
-    & $script:installScript -ClineDir $Env.ClineDir -DocumentsDir $Env.Documents `
-        -McpFile $Env.McpFile -ManifestFile $Env.Manifest -DryRun:$DryRun -NoPrune:$NoPrune 6>$null
-}
-
-function Invoke-Uninstall {
-    param($Env, [switch]$RestoreMcpBackup, [switch]$DryRun)
-    $exe = (Get-Process -Id $PID).Path
-    $cliArgs = @(
-        '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $script:uninstallScript,
-        '-ClineDir', $Env.ClineDir, '-DocumentsDir', $Env.Documents,
-        '-McpFile', $Env.McpFile, '-ManifestFile', $Env.Manifest
-    )
-    if ($RestoreMcpBackup) { $cliArgs += '-RestoreMcpBackup' }
-    if ($DryRun) { $cliArgs += '-DryRun' }
-    & $exe @cliArgs 6>$null | Out-Null
-    return $LASTEXITCODE
-}
-
-function New-SeedMcpConfig {
-    param([string]$Path, [string]$ApiKey)
-    $seed = [ordered]@{
-        mcpServers = [ordered]@{
-            'my-custom' = [ordered]@{
-                command     = 'npx'
-                args        = @('-y', 'my-server')
-                disabled    = $false
-                autoApprove = @('do_stuff')
-            }
-            tavily = [ordered]@{
-                type        = 'streamableHttp'
-                url         = ('https://mcp.tavily.com/mcp/?tavilyApiKey=' + $ApiKey)
-                disabled    = $false
-                autoApprove = @()
-            }
-        }
-    }
-    Write-JsonFile -Path $Path -Object $seed
-}
+Import-Module (Join-Path $PSScriptRoot 'lib\TestHelpers.psm1') -Force
 
 Describe 'install.ps1: MCP merge' {
     It 'сохраняет существующий сервер с ключом и добавляет недостающие из шаблона' {
         $e = New-TestEnv
         try {
-            New-SeedMcpConfig -Path $e.McpFile -ApiKey $script:testKey
+            New-SeedMcpConfig -Path $e.McpFile 
             Invoke-Install -Env $e
 
             $after = [IO.File]::ReadAllText($e.McpFile) | ConvertFrom-Json
@@ -99,7 +23,7 @@ Describe 'install.ps1: MCP merge' {
             Assert-True ([bool]$after.mcpServers.'my-custom') 'сервер my-custom потерян при установке'
             Assert-True (@($after.mcpServers.'my-custom'.args) -contains 'my-server') 'аргументы my-custom изменены'
             Assert-True (@($after.mcpServers.'my-custom'.autoApprove) -contains 'do_stuff') 'autoApprove my-custom изменён'
-            Assert-True ($after.mcpServers.tavily.url -like ('*' + $script:testKey + '*')) 'ключ Tavily потерян'
+            Assert-True ($after.mcpServers.tavily.url -like ('*' + (Get-TestApiKey) + '*')) 'ключ Tavily потерян'
             Assert-True ([bool]$after.mcpServers.memory) 'сервер memory из шаблона не добавлен'
 
             $backup = @(Get-ChildItem -LiteralPath (Split-Path -Parent $e.McpFile) -Filter 'cline_mcp_settings.json.bak-*' -File -ErrorAction SilentlyContinue)
@@ -209,7 +133,7 @@ Describe 'uninstall.ps1' {
     It '-RestoreMcpBackup возвращает MCP-конфиг из бэкапа' {
         $e = New-TestEnv
         try {
-            New-SeedMcpConfig -Path $e.McpFile -ApiKey $script:testKey
+            New-SeedMcpConfig -Path $e.McpFile 
             Invoke-Install -Env $e
             Write-JsonFile -Path $e.McpFile -Object ([pscustomobject]@{ mcpServers = [pscustomobject]@{} })
 
@@ -218,7 +142,7 @@ Describe 'uninstall.ps1' {
             Assert-True ($code -eq 0) ("uninstall вернул код {0}" -f $code)
             $restored = [IO.File]::ReadAllText($e.McpFile) | ConvertFrom-Json
             Assert-True ([bool]$restored.mcpServers.'my-custom') 'кастомный сервер не восстановлен из бэкапа'
-            Assert-True ($restored.mcpServers.tavily.url -like ('*' + $script:testKey + '*')) 'ключ Tavily не восстановлен'
+            Assert-True ($restored.mcpServers.tavily.url -like ('*' + (Get-TestApiKey) + '*')) 'ключ Tavily не восстановлен'
         } finally { Remove-TestEnv $e }
     }
 }

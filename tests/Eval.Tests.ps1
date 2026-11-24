@@ -1,17 +1,13 @@
 ﻿#requires -Version 5.1
 <#
     Тесты eval-харнесса: метрики, измеритель контекста и валидность задач.
-    Ассерты через throw — совместимо с Pester 3.x и 5.x.
+
+    Хелперы — в модуле tests/lib/TestHelpers.psm1 (Pester 5 не видит объявления
+    из шапки тест-файла внутри It). Ассерты через throw — Pester 3.x и 5.x.
 #>
 
-$script:repoRoot = Split-Path -Parent $PSScriptRoot
-$script:evalRoot = Join-Path $script:repoRoot 'eval'
-Import-Module (Join-Path $script:evalRoot 'lib\Metrics.psm1') -Force
-
-function Assert-True {
-    param([bool]$Condition, [string]$Message)
-    if (-not $Condition) { throw $Message }
-}
+Import-Module (Join-Path $PSScriptRoot 'lib\TestHelpers.psm1') -Force
+Import-Module (Join-Path (Split-Path -Parent $PSScriptRoot) 'eval\lib\Metrics.psm1') -Force
 
 Describe 'Metrics: заглушки' {
     It 'находит TODO и пустые тела в добавленных строках' {
@@ -95,30 +91,11 @@ Describe 'Metrics: Measure-Workspace' {
     }
 }
 
-function Invoke-EvalScript {
-    param([string]$ScriptPath, [string[]]$Arguments = @())
-
-    $prevEap = $ErrorActionPreference
-    $ErrorActionPreference = 'Continue'
-    try {
-        $list = @($Arguments)
-        $raw = & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $ScriptPath @list 2>&1
-        $code = $LASTEXITCODE
-    } finally {
-        $ErrorActionPreference = $prevEap
-    }
-
-    return [pscustomobject]@{
-        code = $code
-        text = (($raw | ForEach-Object { [string]$_ }) -join "`n")
-    }
-}
-
 Describe 'eval: валидность задач' {
     It 'все задачи проходят проверку broken=fail / solution=pass' {
         $outDir = Join-Path ([IO.Path]::GetTempPath()) ('eval-out-' + [guid]::NewGuid().ToString('N'))
         try {
-            $run = Invoke-EvalScript -ScriptPath (Join-Path $script:evalRoot 'run-eval.ps1') -Arguments @('-ValidateTasks', '-OutDir', $outDir)
+            $run = Invoke-EvalScript -ScriptPath (Join-Path (Get-EvalRoot) 'run-eval.ps1') -Arguments @('-ValidateTasks', '-OutDir', $outDir)
             Assert-True ($run.code -eq 0) ("run-eval -ValidateTasks вернул {0}:`n{1}" -f $run.code, $run.text)
             Assert-True ($run.text -match 'Все задачи валидны') ("нет подтверждения валидности в выводе:`n{0}" -f $run.text)
         } finally {
@@ -129,7 +106,7 @@ Describe 'eval: валидность задач' {
 
 Describe 'eval: measure-context' {
     It 'измеряет слои и always-on стоимость' {
-        $run = Invoke-EvalScript -ScriptPath (Join-Path $script:evalRoot 'measure-context.ps1') -Arguments @('-Json')
+        $run = Invoke-EvalScript -ScriptPath (Join-Path (Get-EvalRoot) 'measure-context.ps1') -Arguments @('-Json')
         Assert-True ($run.code -eq 0) ("measure-context вернул {0}:`n{1}" -f $run.code, $run.text)
 
         $data = $run.text | ConvertFrom-Json
@@ -141,7 +118,7 @@ Describe 'eval: measure-context' {
     }
 
     It 'always-on равен сумме только always-on слоёв' {
-        $run = Invoke-EvalScript -ScriptPath (Join-Path $script:evalRoot 'measure-context.ps1') -Arguments @('-Json')
+        $run = Invoke-EvalScript -ScriptPath (Join-Path (Get-EvalRoot) 'measure-context.ps1') -Arguments @('-Json')
         $data = $run.text | ConvertFrom-Json
 
         $expected = 0
