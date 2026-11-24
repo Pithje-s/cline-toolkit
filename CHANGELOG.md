@@ -6,6 +6,12 @@
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-11-24
+
+### Исправлено
+- Тесты не запускались на Pester 5 (CI): Pester 5 выполняет блоки `It` в отдельной области видимости, поэтому функции и переменные из шапки тест-файла там недоступны (`CommandNotFoundException: Assert-True`, `New-TestEnv`). Хелперы вынесены в модуль `tests/lib/TestHelpers.psm1`, который виден в любом блоке и одинаково работает на Pester 3.x и 5.x.
+- Раннер `tests/run-tests.ps1` печатает подробности падений и на Pester 3.x (`.TestResult`), и на Pester 5.x (`.Failed`).
+
 ## [0.5.0] - 2026-11-24
 
 ### Изменено
@@ -76,7 +82,8 @@
 - `install.ps1` — установка в глобальные каталоги Cline с сохранением ключа Tavily.
 - `LICENSE` (MIT), `.gitignore`, `README.md`.
 
-[Unreleased]: https://github.com/Pithje-s/cline-toolkit/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/Pithje-s/cline-toolkit/compare/v0.5.1...HEAD
+[0.5.1]: https://github.com/Pithje-s/cline-toolkit/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/Pithje-s/cline-toolkit/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/Pithje-s/cline-toolkit/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/Pithje-s/cline-toolkit/compare/v0.2.0...v0.3.0
