@@ -105,3 +105,16 @@
 Заготовки включаются установкой `"disabled": false` и указанием реальных путей
 (для `filesystem` и `git`). Ключ Tavily храните вне репозитория — см. раздел
 «Безопасность» в [README](README.md).
+
+Перед подключением любого сервера — пройдите чек-лист аудита:
+[`mcp/SECURITY.md`](mcp/SECURITY.md) (источник, права, секреты, allowlist).
+
+---
+
+## Инженерная обвязка
+
+- `validate.ps1` — проверка целостности: frontmatter, JSON, секреты, CJK, дубли и потенциальные противоречия.
+- `.github/workflows/validate.yml` — CI, запускающий валидатор на push/PR.
+- `config.example.json` — advisory-параметры (язык, лимит попыток, пороги плана, allowlist).
+- `install.ps1` — установка в глобальные каталоги Cline с сохранением ключа Tavily.
+- `CHANGELOG.md` / `CONTRIBUTING.md` / `LICENSE` — версионирование, правила вклада, лицензия (MIT).

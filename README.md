@@ -3,6 +3,7 @@
 ![version](https://img.shields.io/badge/version-0.1.0-blue)
 ![license](https://img.shields.io/badge/license-MIT-green)
 ![validator](https://img.shields.io/badge/validate-run%20validate.ps1-informational)
+![CI](https://github.com/Pithje-s/cline-toolkit/actions/workflows/validate.yml/badge.svg)
 
 Единый репозиторий для конфигурации Cline: правила, навыки, воркфлоу и MCP-настройки.
 Соберите один раз — используйте во всех проектах и делитесь с командой.
@@ -169,6 +170,9 @@ Cline (или другому агенту) из корня склонирова�
 
 > JSON не поддерживает комментарии, поэтому описание каждого сервера вынесено
 > в эту таблицу, а не в сам файл.
+>
+> **Перед подключением любого MCP-сервера пройдите аудит по чек-листу
+> [mcp/SECURITY.md](mcp/SECURITY.md)** — источник, права, секреты, allowlist.
 
 ## Безопасность: API-ключ Tavily
 
@@ -230,7 +234,22 @@ pull request. Чем универсальнее и качественнее ко
 
 ## Кастомизация (переносимость)
 
-Правила намеренно «opinionated», но их легко адаптировать. Что чаще всего меняют:
+Правила намеренно «opinionated», но их легко адаптировать. Параметры по умолчанию
+собраны в [`config.example.json`](config.example.json) — скопируйте в `config.json`
+и используйте как чек-лист того, что стоит подкрутить под свой проект:
+
+```json
+{ "language": "ru", "repairAttempts": 3, "plan": { "maxFiles": 1, "maxLines": 20 },
+  "cjkRuleEnabled": true, "mcp": { "allowlist": ["tavily"] } }
+```
+
+> `config.example.json` — **advisory-конфиг**: правила — это Markdown, поэтому
+> скрипты валидируют/подсказывают значения, но не переписывают прозу автоматически.
+> Для команд можно задавать соглашения через env-переменные (`CLINE_LANG`,
+> `CLINE_REPAIR_ATTEMPTS` и т.п. — см. блок `env` в конфиге). `validate.ps1`
+> проверяет валидность этого JSON.
+
+Что чаще всего меняют:
 
 | Что | Где | Как настроить под себя |
 |---|---|---|

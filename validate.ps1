@@ -17,8 +17,10 @@ $ProgressPreference = 'SilentlyContinue'
 
 $fail = 0
 $script:failCount = 0
+$script:warnCount = 0
 function Ok($m)   { Write-Host "  [OK]   $m" }
 function Bad($m)  { Write-Host "  [FAIL] $m"; $script:failCount++ }
+function Warn($m) { Write-Host "  [WARN] $m"; $script:warnCount++ }
 
 function Get-Frontmatter($path) {
     $lines = Get-Content -Path $path -ErrorAction Stop
@@ -93,11 +95,79 @@ $cjk = $mdFiles | Select-String -Pattern '[\u4e00-\u9fff\u3040-\u30ff]' -AllMatc
 if ($cjk) { $cjk | ForEach-Object { Bad "CJK в $($_.Filename):$($_.LineNumber)" } }
 else { Ok "иероглифов нет" }
 
+# 6. Конфиг + дубли/противоречия
+Write-Host "[6/6] config + дубли/противоречия" -ForegroundColor Cyan
+
+$cfg = Join-Path $RepoRoot 'config.example.json'
+if (Test-Path $cfg) {
+    try { Get-Content $cfg -Raw | ConvertFrom-Json | Out-Null; Ok "config.example.json валиден" }
+    catch { Bad "config.example.json невалиден: $($_.Exception.Message)" }
+} else { Bad "config.example.json отсутствует" }
+
+$ruleFiles  = Get-ChildItem -Path (Join-Path $RepoRoot 'rules') -Filter '*.md' -File -ErrorAction SilentlyContinue
+$skillFiles = Get-ChildItem -Path (Join-Path $RepoRoot 'skills') -Recurse -File -Filter 'SKILL.md' -ErrorAction SilentlyContinue
+$textFiles  = @($ruleFiles) + @($skillFiles)
+
+# 6a. Дубли заголовков ### между файлами
+$headings = @{}
+foreach ($f in $textFiles) {
+    Get-Content -Path $f.FullName | ForEach-Object {
+        if ($_ -match '^###\s+(.+?)\s*$') {
+            $h = $Matches[1].Trim()
+            if ($headings.ContainsKey($h)) { Bad "дубль заголовка '### $h' ($($f.Name) / $($headings[$h]))" }
+            else { $headings[$h] = $f.Name }
+        }
+    }
+}
+Ok "заголовки проверены ($($headings.Count) уникальных)"
+
+# 6b. Дубли строк (>40 симв.) между файлами правил/навыков
+$seen = @{}
+$dupFound = $false
+foreach ($f in $textFiles) {
+    Get-Content -Path $f.FullName | ForEach-Object {
+        $line = $_.Trim()
+        if ($line.Length -gt 40 -and $line -notmatch '^#' -and $line -notmatch '^\[.*\]\(') {
+            if ($seen.ContainsKey($line) -and $seen[$line] -ne $f.Name) {
+                Bad "дубль строки '...$($line.Substring(0,[Math]::Min(40,$line.Length)))...' ($($f.Name) / $($seen[$line]))"
+                $dupFound = $true
+            } elseif (-not $seen.ContainsKey($line)) {
+                $seen[$line] = $f.Name
+            }
+        }
+    }
+}
+if (-not $dupFound) { Ok "дублирующихся строк нет" }
+
+# 6c. Противоречия (эвристика, WARN): один и тот же термин запрещён в одном месте и разрешён в другом
+$stop = @('только','также','тогда','после','перед','между','чтобы','который','можно','нельзя','запрещено','разрешено','разреш','должен','должна','должны','будет','может','нужно','также','через','если','либо','свой','свои')
+$prohibit = @{}; $allowT = @{}
+foreach ($f in $textFiles) {
+    Get-Content -Path $f.FullName | ForEach-Object {
+        $line = $_
+        $tokens = ([regex]::Matches($line.ToLower(), '[а-яё]{5,}') | ForEach-Object { $_.Value }) | Where-Object { $stop -notcontains $_ } | Select-Object -Unique
+        if ($line -match 'ЗАПРЕЩЕНО|запрещ|нельзя|не разреш') {
+            foreach ($t in $tokens) { $prohibit[$t] = $true }
+        }
+        if ($line -match 'разрешено|разреш\b|\bможно\b') {
+            foreach ($t in $tokens) { $allowT[$t] = $true }
+        }
+    }
+}
+$conflicts = @()
+foreach ($t in $prohibit.Keys) { if ($allowT.ContainsKey($t)) { $conflicts += $t } }
+if ($conflicts.Count -gt 0) {
+    $conflicts | Select-Object -First 12 | ForEach-Object { Warn "возможное противоречие по термину '$_' (запрещено в одном месте, разрешено в другом) — проверьте вручную" }
+} else { Ok "явных противоречий не найдено" }
+
 Write-Host ""
-if ($script:failCount -eq 0) {
+if ($script:failCount -eq 0 -and $script:warnCount -eq 0) {
     Write-Host "RESULT: PASS" -ForegroundColor Green
     exit 0
+} elseif ($script:failCount -eq 0) {
+    Write-Host "RESULT: PASS (с $($script:warnCount) предупреждениями)" -ForegroundColor Yellow
+    exit 0
 } else {
-    Write-Host "RESULT: FAIL ($($script:failCount) проблем)" -ForegroundColor Red
+    Write-Host "RESULT: FAIL ($($script:failCount) проблем, $($script:warnCount) предупреждений)" -ForegroundColor Red
     exit 1
 }

@@ -1,0 +1,22 @@
+{
+  "$comment": "Пример параметров cline-toolkit. Это advisory-конфиг: правила — Markdown, скрипты подставляют/проверяют значения, а не меняют прозу автоматически. Скопируйте в config.json и правьте под себя.",
+  "language": "ru",
+  "repairAttempts": 3,
+  "plan": {
+    "maxFiles": 1,
+    "maxLines": 20
+  },
+  "cjkRuleEnabled": true,
+  "memoryBankEnabled": true,
+  "mcp": {
+    "allowlist": [
+      "tavily"
+    ]
+  },
+  "env": {
+    "CLINE_LANG": "ru",
+    "CLINE_REPAIR_ATTEMPTS": "3",
+    "CLINE_PLAN_MAX_FILES": "1",
+    "CLINE_PLAN_MAX_LINES": "20"
+  }
+}

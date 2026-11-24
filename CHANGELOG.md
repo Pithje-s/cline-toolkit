@@ -8,8 +8,11 @@
 
 ### Добавлено
 - `CATALOG.md` — полный справочник по каждому правилу, навыку, воркфлоу и MCP-серверу.
-- `validate.ps1` — инженерная валидация (frontmatter skills/workflows, JSON MCP, секреты, CJK).
+- `validate.ps1` — инженерная валидация: frontmatter skills/workflows, JSON MCP и `config.example.json`, поиск секретов, CJK, **дублей заголовков/строк** и **потенциальных противоречий** (WARN).
 - `CHANGELOG.md` (этот файл) и `CONTRIBUTING.md`.
+- `.github/workflows/validate.yml` — CI-проверка `validate.ps1` на push/PR.
+- `mcp/SECURITY.md` — чек-лист аудита MCP-сервера перед подключением (источник, права, секреты, allowlist).
+- `config.example.json` — advisory-параметры (язык, лимит попыток, пороги плана, allowlist) + env-соглашения.
 - Мета-правило верхнего уровня против Prompt Injection в `rules/01-core.md`.
 - Политика безопасности MCP-серверов (защита от Shadow IT) в `rules/02-quality-git.md`.
 - Промпт автоустановки для ИИ-агента и раздел «Адаптация под себя и вклад» в `README.md`.
