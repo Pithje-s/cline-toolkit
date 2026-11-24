@@ -48,7 +48,7 @@ Do NOT:
 | Security | Injection, authz/authn gaps, secret leakage, unsafe deserialization, missing validation? |
 | Dependencies | New import/package used but not added to manifest? Version pinned? Removed import still referenced? |
 | Contracts | Signature/return/type changes that break callers? Tests updated? |
-| Placeholders | Any `TODO`/`FIXME`, pseudocode, `... existing code ...`, or empty bodies (`pass`, `{}`) left in the change? |
+| Placeholders | Stub or code "tail" per rule Zero Placeholders (`TODO`, pseudocode, `... existing code ...`, empty bodies)? |
 | Comment noise | Redundant comments restating WHAT the code does, echoing names, or AI meta-comments (`// Changed code`)? |
 | Correctness vs task | Does it actually meet every acceptance criterion? |
 
@@ -76,7 +76,7 @@ SUMMARY
 
 ## Severity guide
 
-- **Blocker**: security hole, data loss, crash, core requirement not met, will break in production, OR any placeholder / unfinished logic / code "tails" (`... existing code ...`, `TODO`, empty bodies) left in the change
+- **Blocker**: security hole, data loss, crash, core requirement not met, will break in production, OR any placeholder / unfinished logic / code "tail" (definition — rule Zero Placeholders)
 - **Major**: real bug under some input, unhandled edge case, missing dependency, broken contract
 - **Minor**: readability, naming, minor perf, style consistency - not correctness
 - **Comment noise**: excessive comments explaining the obvious -> MINOR (or MAJOR if excessive); resolution: "Удалить шумные комментарии, код должен говорить сам за себя"
@@ -88,4 +88,4 @@ SUMMARY
 - If you cannot find Blocker/Major issues, say APPROVE - do not invent problems to look busy.
 - Do not output a rewritten file. Output a verdict + findings only.
 - If requirements are missing/unclear, state that as a Blocker ("cannot verify against unknown criteria").
-- Any placeholder, stub, unfinished logic, or code "tail" (`... existing code ...`, `TODO: implement`, empty function bodies) is an AUTOMATIC BLOCKER. Such code cannot be approved.
+- Any placeholder, stub, unfinished logic, or code "tail" is an AUTOMATIC BLOCKER (definition — rule Zero Placeholders in `rules/01-core.md`). Such code cannot be approved.

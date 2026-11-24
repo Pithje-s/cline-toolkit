@@ -4,8 +4,6 @@ description: Memory Bank consolidation - compact and prune Memory Bank files whe
 
 Консолидация памяти: сжать и почистить Memory Bank, когда контекст переполнен. Запускается вручную.
 
--globals: [manage_knowledge, sequential-thinking]
-
 ## Когда запускать
 
 - Контекст переполнен / раздут устаревшими записями
@@ -42,7 +40,7 @@ description: Memory Bank consolidation - compact and prune Memory Bank files whe
 - Не удаляй информацию молча — заменяй объёмное на сжатое
 
 ### 4. Обнови файлы
-Перезапиши каждый консолидированный файл (используй update_memory_bank). Покажи, что убрано и что сжато.
+Перезапиши каждый консолидированный файл через `write_to_file` (для точечных изменений — `replace_in_file`). Покажи, что убрано и что сжато.
 
 ### 5. Отчитайся
 ```

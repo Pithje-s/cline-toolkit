@@ -38,13 +38,9 @@ Test-Path <path>; Get-Content <path> -Head 20
 Expected: each intended file appears in the diff / exists with the expected content.
 If an intended edit is missing -> re-apply it now. Do NOT report done.
 
-### Step 1.5 - Placeholder scan (Zero Placeholders Policy)
+### Step 1.5 - Placeholder scan (см. правило Zero Placeholders)
 
-Scan the final diff / changed files for stubs before declaring success:
-
-- `TODO`, `FIXME`, `XXX` that were NOT present before your changes
-- Pseudocode or comments hiding code: `...`, `// rest of code`, `... existing code ...`, `// implement me`
-- Empty function/method bodies: `pass`, `{}`, `return null`/`return None` standing in for real logic (unless user explicitly asked for a scaffold)
+Определение заглушки — в `rules/01-core.md` (Zero Placeholders). Здесь только механика проверки:
 
 ```powershell
 # Scan only the changes for placeholder markers
@@ -53,7 +49,7 @@ git --no-pager diff | Select-String -Pattern 'TODO','FIXME','XXX','rest of code'
 
 If ANY placeholder that you introduced is found -> verdict **FAIL**, cite the exact lines, and implement the real code (or ask for missing context - never leave a stub). Pre-existing markers unrelated to your change are noted, not failed.
 
-### Step 1.55 - Comment Noise Check (Clean Code & Comments Policy)
+### Step 1.55 - Comment Noise Check (см. правило «Комментарии»)
 
 Scan the added/changed lines for redundant comments:
 

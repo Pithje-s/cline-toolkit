@@ -4,8 +4,6 @@ description: Pre-completion checkpoint (used from Act before declaring a task do
 
 Финальный чек-лист перед тем, как объявить задачу выполненной. Если хоть один пункт не выполнен — задача НЕ завершена.
 
--globals: [manage_knowledge, sequential-thinking]
-
 ## 0. Изменения применены к файлам?
 
 - Каждый intended-файл реально изменён (`git --no-pager diff --stat`)
@@ -52,11 +50,10 @@ description: Pre-completion checkpoint (used from Act before declaring a task do
 - [ ] в коммите нет секретов, `.env`, ключей, артефактов сборки
 - [ ] проверки зелёные до пуша
 
-## 7. Zero Placeholders (финальный чек-лист)
+## 7. Zero Placeholders
 
-- [ ] В коде нет незакрытых TODO, псевдокода или пропущенных блоков. Код написан целиком.
-- [ ] Нет заглушек `... existing code ...`, `// rest of code`, пустых тел (`pass`, `{}`) — если не запрошен scaffold
-- [ ] Каждый изменённый блок/функция выдан(ы) полностью, без сокращений (ellipsis)
+- [ ] Заглушек нет по определению из `rules/01-core.md` (Zero Placeholders): `TODO`, псевдокод, `... existing code ...`, пустые тела — если scaffold не запрашивался явно.
+- [ ] Каждый изменённый блок/функция выданы целиком, без сокращений.
 
 ## 8. Оркестрация следующего шага
 

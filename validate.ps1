@@ -15,7 +15,6 @@ param(
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 
-$fail = 0
 $script:failCount = 0
 $script:warnCount = 0
 function Ok($m)   { Write-Host "  [OK]   $m" }
@@ -36,14 +35,14 @@ function Get-Frontmatter($path) {
 Write-Host "== validate.ps1: $RepoRoot ==" -ForegroundColor Cyan
 
 # 1. rules
-Write-Host "[1/5] rules/" -ForegroundColor Cyan
+Write-Host "[1/8] rules/" -ForegroundColor Cyan
 foreach ($r in '01-core.md','02-quality-git.md','03-workflow-search.md') {
     $p = Join-Path $RepoRoot "rules\$r"
     if (Test-Path $p) { Ok "rules/$r" } else { Bad "rules/$r отсутствует" }
 }
 
 # 2. skills frontmatter
-Write-Host "[2/5] skills/" -ForegroundColor Cyan
+Write-Host "[2/8] skills/" -ForegroundColor Cyan
 $skillsDir = Join-Path $RepoRoot 'skills'
 if (-not (Test-Path $skillsDir)) { Bad "skills/ отсутствует" }
 else {
@@ -59,7 +58,7 @@ else {
 }
 
 # 3. workflows frontmatter
-Write-Host "[3/5] workflows/" -ForegroundColor Cyan
+Write-Host "[3/8] workflows/" -ForegroundColor Cyan
 $wfDir = Join-Path $RepoRoot 'workflows'
 if (-not (Test-Path $wfDir)) { Bad "workflows/ отсутствует" }
 else {
@@ -72,7 +71,7 @@ else {
 }
 
 # 4. MCP JSON + секреты
-Write-Host "[4/5] mcp/ + секреты" -ForegroundColor Cyan
+Write-Host "[4/8] mcp/ + секреты" -ForegroundColor Cyan
 $mcp = Join-Path $RepoRoot 'mcp\cline_mcp_settings.json'
 if (-not (Test-Path $mcp)) { Bad "mcp/cline_mcp_settings.json отсутствует" }
 else {
@@ -89,14 +88,14 @@ if ($realLeak) { $realLeak | ForEach-Object { Bad "возможный секре
 else { Ok "реальных ключей tvly- не найдено" }
 
 # 5. CJK-иероглифы в .md
-Write-Host "[5/5] CJK-проверка .md" -ForegroundColor Cyan
+Write-Host "[5/8] CJK-проверка .md" -ForegroundColor Cyan
 $mdFiles = $allFiles | Where-Object { $_.Extension -eq '.md' }
 $cjk = $mdFiles | Select-String -Pattern '[\u4e00-\u9fff\u3040-\u30ff]' -AllMatches -ErrorAction SilentlyContinue
 if ($cjk) { $cjk | ForEach-Object { Bad "CJK в $($_.Filename):$($_.LineNumber)" } }
 else { Ok "иероглифов нет" }
 
 # 6. Конфиг + дубли/противоречия
-Write-Host "[6/6] config + дубли/противоречия" -ForegroundColor Cyan
+Write-Host "[6/8] config + дубли/противоречия" -ForegroundColor Cyan
 
 $cfg = Join-Path $RepoRoot 'config.example.json'
 if (Test-Path $cfg) {
@@ -159,6 +158,32 @@ foreach ($t in $prohibit.Keys) { if ($allowT.ContainsKey($t)) { $conflicts += $t
 if ($conflicts.Count -gt 0) {
     $conflicts | Select-Object -First 12 | ForEach-Object { Warn "возможное противоречие по термину '$_' (запрещено в одном месте, разрешено в другом) — проверьте вручную" }
 } else { Ok "явных противоречий не найдено" }
+
+# 7. Обязательные файлы поставки
+Write-Host "[7/8] файлы поставки" -ForegroundColor Cyan
+foreach ($f in @('install.ps1', 'uninstall.ps1', 'tests\Install.Tests.ps1', 'tests\run-tests.ps1',
+        'tests\Eval.Tests.ps1', 'eval\run-eval.ps1', 'eval\measure-context.ps1',
+        'eval\lib\Metrics.psm1', 'EVAL.md')) {
+    if (Test-Path (Join-Path $RepoRoot $f)) { Ok $f } else { Bad "$f отсутствует" }
+}
+
+# 8. Устаревшие директивы: регресс-гард на конструкции, которых нет в Cline.
+# Сканируются только правила/навыки/воркфлоу — в CHANGELOG эти строки упоминаются законно.
+Write-Host "[8/8] устаревшие директивы" -ForegroundColor Cyan
+$stalePatterns = @('-glo' + 'bals:', 'update_' + 'memory_bank')
+$scanFiles = @()
+$scanFiles += @(Get-ChildItem -Path (Join-Path $RepoRoot 'rules') -Filter '*.md' -File -ErrorAction SilentlyContinue)
+$scanFiles += @(Get-ChildItem -Path (Join-Path $RepoRoot 'workflows') -Filter '*.md' -File -ErrorAction SilentlyContinue)
+$scanFiles += @(Get-ChildItem -Path (Join-Path $RepoRoot 'skills') -Recurse -File -Filter 'SKILL.md' -ErrorAction SilentlyContinue)
+$staleHits = 0
+foreach ($pattern in $stalePatterns) {
+    $found = @($scanFiles | Select-String -Pattern ([regex]::Escape($pattern)) -ErrorAction SilentlyContinue)
+    foreach ($hit in $found) {
+        Bad "устаревшая ссылка '$pattern' в $($hit.Filename):$($hit.LineNumber)"
+        $staleHits++
+    }
+}
+if ($staleHits -eq 0) { Ok "устаревших директив нет ($(@($scanFiles).Count) файлов проверено)" }
 
 Write-Host ""
 if ($script:failCount -eq 0 -and $script:warnCount -eq 0) {
