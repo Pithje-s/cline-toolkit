@@ -21,3 +21,6 @@ mcp/*.local.json
 **/*.messages.json
 **/*.compaction.json
 **/checkpoint-scratch/
+
+# Результаты eval-прогонов
+eval/results/
