@@ -16,3 +16,17 @@ jobs:
       - name: Run cline-toolkit validator
         shell: pwsh
         run: ./validate.ps1
+
+      - name: Ensure Pester is available
+        shell: pwsh
+        run: |
+          $pester = Get-Module -ListAvailable Pester | Sort-Object Version -Descending | Select-Object -First 1
+          if (-not $pester) {
+            Install-Module Pester -MinimumVersion 5.5.0 -Scope CurrentUser -Force -SkipPublisherCheck
+          } else {
+            Write-Host "Pester $($pester.Version) уже установлен"
+          }
+
+      - name: Run installer tests
+        shell: pwsh
+        run: ./tests/run-tests.ps1
